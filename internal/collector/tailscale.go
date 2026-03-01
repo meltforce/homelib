@@ -133,7 +133,7 @@ func (t *TailscaleCollector) peerToHost(hostname string, ips []netip.Addr, osNam
 
 	return model.Host{
 		Name:        hostname,
-		Source:      "tailscale",
+		Sources:     []string{"tailscale"},
 		HostType:    "tailscale",
 		Status:      status,
 		Zone:        zone,

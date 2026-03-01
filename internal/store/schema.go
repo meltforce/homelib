@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS hosts (
 	id               INTEGER PRIMARY KEY AUTOINCREMENT,
 	run_id           INTEGER NOT NULL REFERENCES collection_runs(id),
 	name             TEXT NOT NULL,
-	source           TEXT NOT NULL,
+	sources          TEXT NOT NULL,
 	host_type        TEXT NOT NULL,
 	status           TEXT NOT NULL,
 	zone             TEXT,
@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS config (
 
 CREATE INDEX IF NOT EXISTS idx_hosts_run_id ON hosts(run_id);
 CREATE INDEX IF NOT EXISTS idx_hosts_name ON hosts(name);
-CREATE INDEX IF NOT EXISTS idx_hosts_source ON hosts(source);
+CREATE INDEX IF NOT EXISTS idx_hosts_sources ON hosts(sources);
 CREATE INDEX IF NOT EXISTS idx_services_run_id ON services(run_id);
 CREATE INDEX IF NOT EXISTS idx_services_host ON services(host_name);
 CREATE INDEX IF NOT EXISTS idx_findings_run_id ON findings(run_id);

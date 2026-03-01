@@ -17,7 +17,7 @@
   {{range .Hosts}}
     <tr>
       <td><a href="/hosts/{{.Name}}">{{.Name}}</a></td>
-      <td>{{.Source}}</td>
+      <td>{{.SourcesString}}</td>
       <td>{{.HostType}}</td>
       <td><span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span></td>
       <td>{{.Zone}}</td>

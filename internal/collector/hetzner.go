@@ -139,7 +139,7 @@ func (h *HetznerCollector) Collect(ctx context.Context) (*model.CollectionResult
 
 		host := model.Host{
 			Name:           srv.Name,
-			Source:         "hetzner",
+			Sources:        []string{"hetzner"},
 			HostType:       "cloud",
 			Status:         string(srv.Status),
 			Zone:           zone,

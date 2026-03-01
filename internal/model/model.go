@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -33,7 +34,7 @@ type Host struct {
 	ID             int64            `json:"id"`
 	RunID          int64            `json:"run_id"`
 	Name           string           `json:"name"`
-	Source         string           `json:"source"`
+	Sources        []string         `json:"sources"`
 	HostType       string           `json:"host_type"` // node, vm, lxc, cloud, device, tailscale
 	Status         string           `json:"status"`    // running, stopped, online, offline
 	Zone           string           `json:"zone"`      // homelab, private-cloud, public-cloud
@@ -47,6 +48,22 @@ type Host struct {
 	Category       string           `json:"category,omitempty"`
 	MonthlyCostEUR float64          `json:"monthly_cost_eur,omitempty"`
 	Details        *json.RawMessage `json:"details,omitempty"`
+	ServiceCount   int              `json:"service_count,omitempty"`
+}
+
+// SourcesString returns sources joined with ", " for display in templates.
+func (h Host) SourcesString() string {
+	return strings.Join(h.Sources, ", ")
+}
+
+// HasSource returns true if the host has the given source.
+func (h Host) HasSource(source string) bool {
+	for _, s := range h.Sources {
+		if s == source {
+			return true
+		}
+	}
+	return false
 }
 
 // Service represents a Docker container/service.

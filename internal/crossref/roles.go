@@ -12,17 +12,15 @@ func ApplyRoles(hosts []model.Host, roles config.RolesConfig) []model.Host {
 	for i := range hosts {
 		h := &hosts[i]
 
-		switch h.Source {
-		case "proxmox":
+		if h.HasSource("proxmox") {
 			if h.HostType == "node" {
 				applyProxmoxNodeRole(h, roles)
 			} else {
 				applyGuestApplication(h, roles)
 			}
-		case "tailscale":
+		} else if h.HasSource("tailscale") {
 			applyTailscaleRole(h, roles)
-		default:
-			// For other sources, try guest application lookup
+		} else {
 			applyGuestApplication(h, roles)
 		}
 	}

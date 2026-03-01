@@ -88,7 +88,7 @@ func (p *ProxmoxCollector) collectNodes(ctx context.Context) ([]model.Host, erro
 	for _, n := range nodesData {
 		host := model.Host{
 			Name:     n.Node,
-			Source:   "proxmox",
+			Sources:  []string{"proxmox"},
 			HostType: "node",
 			Status:   n.Status,
 			Zone:     "homelab",
@@ -194,7 +194,7 @@ func (p *ProxmoxCollector) collectGuests(ctx context.Context) ([]model.Host, err
 
 		hosts = append(hosts, model.Host{
 			Name:        r.Name,
-			Source:      "proxmox",
+			Sources:     []string{"proxmox"},
 			HostType:    hostType,
 			Status:      r.Status,
 			Zone:        zone,

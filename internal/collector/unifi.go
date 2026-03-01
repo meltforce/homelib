@@ -216,7 +216,7 @@ func (u *UniFiCollector) collectDevices(ctx context.Context, client *http.Client
 
 		hosts = append(hosts, model.Host{
 			Name:     d.Name,
-			Source:   "unifi",
+			Sources:  []string{"unifi"},
 			HostType: "device",
 			Status:   status,
 			Zone:     "homelab",

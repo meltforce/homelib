@@ -13,7 +13,6 @@ import (
 
 	"github.com/meltforce/homelib/internal/collector"
 	"github.com/meltforce/homelib/internal/config"
-	"github.com/meltforce/homelib/internal/crossref"
 	mcpserver "github.com/meltforce/homelib/internal/mcp"
 	"github.com/meltforce/homelib/internal/scheduler"
 	"github.com/meltforce/homelib/internal/server"
@@ -81,9 +80,6 @@ func main() {
 			orch.Register(collector.NewPluginCollector(pcfg, log))
 		}
 	}
-
-	// Set up cross-reference as a post-processor on the orchestrator
-	_ = crossref.New(log)
 
 	// Build HTTP handler
 	srv, err := server.New(st, orch, log)

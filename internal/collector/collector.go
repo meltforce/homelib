@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/meltforce/homelib/internal/config"
+	"github.com/meltforce/homelib/internal/crossref"
+	"github.com/meltforce/homelib/internal/merge"
 	"github.com/meltforce/homelib/internal/model"
 	"github.com/meltforce/homelib/internal/store"
 	"golang.org/x/sync/errgroup"
@@ -189,10 +191,36 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	// Wait for all collectors — errors are handled per-collector
 	g.Wait()
 
-	// Store all results
+	// Merge hosts from all sources
+	var allHosts []model.Host
 	for _, r := range results {
-		if err := o.storeResult(runID, r.result); err != nil {
+		allHosts = append(allHosts, r.result.Hosts...)
+	}
+	mergedHosts := merge.MergeHosts(allHosts)
+	o.log.Info("merged hosts", "before", len(allHosts), "after", len(mergedHosts))
+
+	// Cross-reference merged hosts
+	cr := crossref.New(o.log)
+	mergedHosts, crFindings := cr.Run(mergedHosts)
+
+	// Store merged hosts once
+	if len(mergedHosts) > 0 {
+		if err := o.store.InsertHosts(runID, mergedHosts); err != nil {
+			o.log.Error("failed to store merged hosts", "error", err)
+		}
+	}
+
+	// Store non-host data from each collector
+	for _, r := range results {
+		if err := o.storeNonHostResult(runID, r.result); err != nil {
 			o.log.Error("failed to store result", "source", r.name, "error", err)
+		}
+	}
+
+	// Store crossref findings
+	if len(crFindings) > 0 {
+		if err := o.store.InsertFindings(runID, crFindings); err != nil {
+			o.log.Error("failed to store crossref findings", "error", err)
 		}
 	}
 
@@ -221,12 +249,7 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	return nil
 }
 
-func (o *Orchestrator) storeResult(runID int64, res *model.CollectionResult) error {
-	if len(res.Hosts) > 0 {
-		if err := o.store.InsertHosts(runID, res.Hosts); err != nil {
-			return fmt.Errorf("store hosts: %w", err)
-		}
-	}
+func (o *Orchestrator) storeNonHostResult(runID int64, res *model.CollectionResult) error {
 	if len(res.Services) > 0 {
 		if err := o.store.InsertServices(runID, res.Services); err != nil {
 			return fmt.Errorf("store services: %w", err)

@@ -74,7 +74,7 @@ func (p *PluginCollector) Collect(ctx context.Context) (*model.CollectionResult,
 		raw := json.RawMessage(detailsJSON)
 		result.Hosts = append(result.Hosts, model.Host{
 			Name:     ph.Name,
-			Source:   "plugin:" + p.cfg.Name,
+			Sources:  []string{"plugin:" + p.cfg.Name},
 			HostType: ph.HostType,
 			Status:   "unknown",
 			Details:  &raw,

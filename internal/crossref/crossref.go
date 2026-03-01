@@ -3,7 +3,6 @@ package crossref
 import (
 	"encoding/json"
 	"log/slog"
-	"strings"
 
 	"github.com/meltforce/homelib/internal/model"
 )
@@ -15,7 +14,7 @@ var tagToZone = map[string]string{
 	"tag:public-cloud":  "public-cloud",
 }
 
-// CrossReference enriches and validates hosts across sources.
+// CrossReference validates merged hosts and produces findings.
 type CrossReference struct {
 	log *slog.Logger
 }
@@ -24,80 +23,71 @@ func New(log *slog.Logger) *CrossReference {
 	return &CrossReference{log: log}
 }
 
-// Run performs cross-referencing across all hosts and returns findings.
-func (cr *CrossReference) Run(hosts []model.Host) (updated []model.Host, findings []model.Finding) {
-	// Index hosts by source and name
-	bySource := make(map[string]map[string]*model.Host)
+// Run validates merged hosts and returns findings.
+// After host merging, each host has combined sources and details keyed by source.
+func (cr *CrossReference) Run(hosts []model.Host) ([]model.Host, []model.Finding) {
+	var findings []model.Finding
+
 	for i := range hosts {
 		h := &hosts[i]
-		if _, ok := bySource[h.Source]; !ok {
-			bySource[h.Source] = make(map[string]*model.Host)
+
+		// Zone validation: compare host zone with tailscale tag zone
+		if !h.HasSource("tailscale") {
+			continue
 		}
-		bySource[h.Source][strings.ToLower(h.Name)] = h
-	}
-
-	tsHosts := bySource["tailscale"]
-	hetznerHosts := bySource["hetzner"]
-	proxmoxHosts := bySource["proxmox"]
-
-	// Hetzner ↔ Tailscale: match by hostname, add Tailscale IP
-	if tsHosts != nil && hetznerHosts != nil {
-		for name, hHost := range hetznerHosts {
-			if tsHost, ok := tsHosts[name]; ok {
-				if hHost.TailscaleIP == "" && tsHost.TailscaleIP != "" {
-					hHost.TailscaleIP = tsHost.TailscaleIP
-				}
-
-				// Zone validation
-				tsZone := zoneFromDetails(tsHost)
-				if tsZone != "" && hHost.Zone != "" && hHost.Zone != "unknown" && tsZone != hHost.Zone {
-					findings = append(findings, model.Finding{
-						Source:      "crossref",
-						FindingType: "zone_mismatch",
-						Severity:    "warning",
-						HostName:    hHost.Name,
-						Message:     "Hetzner zone '" + hHost.Zone + "' differs from Tailscale zone '" + tsZone + "'",
-					})
-				}
-			}
+		if h.HostType == "node" {
+			continue
 		}
-	}
 
-	// Proxmox ↔ Tailscale: validate zones
-	if tsHosts != nil && proxmoxHosts != nil {
-		for name, pHost := range proxmoxHosts {
-			if pHost.HostType == "node" {
-				continue // Skip nodes, only validate guests
+		tsZone := zoneFromMergedDetails(h)
+		if tsZone == "" || h.Zone == "" || h.Zone == "unknown" {
+			continue
+		}
+		if tsZone != h.Zone {
+			sourceLabel := "Host"
+			if h.HasSource("hetzner") {
+				sourceLabel = "Hetzner"
+			} else if h.HasSource("proxmox") {
+				sourceLabel = "Proxmox"
 			}
-			if tsHost, ok := tsHosts[name]; ok {
-				tsZone := zoneFromDetails(tsHost)
-				if tsZone != "" && pHost.Zone != "" && tsZone != pHost.Zone {
-					findings = append(findings, model.Finding{
-						Source:      "crossref",
-						FindingType: "zone_mismatch",
-						Severity:    "warning",
-						HostName:    pHost.Name,
-						Message:     "Proxmox zone '" + pHost.Zone + "' differs from Tailscale zone '" + tsZone + "'",
-					})
-				}
-			}
+			findings = append(findings, model.Finding{
+				Source:      "crossref",
+				FindingType: "zone_mismatch",
+				Severity:    "warning",
+				HostName:    h.Name,
+				Message:     sourceLabel + " zone '" + h.Zone + "' differs from Tailscale zone '" + tsZone + "'",
+			})
 		}
 	}
 
 	return hosts, findings
 }
 
-// zoneFromDetails extracts zone from a Tailscale host's tags in details.
-func zoneFromDetails(h *model.Host) string {
+// zoneFromMergedDetails extracts zone from tailscale details within merged details.
+// Merged details have the form: {"tailscale": {..., "tags": [...]}, "proxmox": {...}}
+func zoneFromMergedDetails(h *model.Host) string {
 	if h.Details == nil {
 		return ""
 	}
+
+	// Try merged format: {"tailscale": {"tags": [...]}}
+	var merged map[string]json.RawMessage
+	if err := json.Unmarshal(*h.Details, &merged); err != nil {
+		return ""
+	}
+
+	tsDetails, ok := merged["tailscale"]
+	if !ok {
+		return ""
+	}
+
 	var details struct {
 		Tags []string `json:"tags"`
 	}
-	if err := json.Unmarshal(*h.Details, &details); err != nil {
+	if err := json.Unmarshal(tsDetails, &details); err != nil {
 		return ""
 	}
+
 	for _, tag := range details.Tags {
 		if z, ok := tagToZone[tag]; ok {
 			return z

@@ -24,12 +24,39 @@ func New(dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
+	// Migrate: if hosts table has old "source" column, drop and recreate
+	if needsHostsMigration(db) {
+		db.Exec("DROP TABLE IF EXISTS hosts")
+	}
+
 	if _, err := db.Exec(schemaSQL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 
 	return &Store{db: db}, nil
+}
+
+// needsHostsMigration checks if the hosts table has the old "source" column.
+func needsHostsMigration(db *sql.DB) bool {
+	rows, err := db.Query("PRAGMA table_info(hosts)")
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			return false
+		}
+		if name == "source" {
+			return true // old schema
+		}
+	}
+	return false
 }
 
 // Close closes the database.
@@ -177,7 +204,7 @@ func (s *Store) InsertHosts(runID int64, hosts []model.Host) error {
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO hosts (run_id, name, source, host_type, status, zone, tailscale_ip,
+		INSERT INTO hosts (run_id, name, sources, host_type, status, zone, tailscale_ip,
 			local_ip, public_ipv4, cpu_cores, memory_mb, disk_gb, application, category,
 			monthly_cost_eur, details)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
@@ -187,7 +214,8 @@ func (s *Store) InsertHosts(runID int64, hosts []model.Host) error {
 	defer stmt.Close()
 
 	for _, h := range hosts {
-		_, err := stmt.Exec(runID, h.Name, h.Source, h.HostType, h.Status, h.Zone,
+		sourcesJSON, _ := json.Marshal(h.Sources)
+		_, err := stmt.Exec(runID, h.Name, string(sourcesJSON), h.HostType, h.Status, h.Zone,
 			nullableString(h.TailscaleIP), nullableString(h.LocalIP), nullableString(h.PublicIPv4),
 			nullableInt(h.CPUCores), nullableInt(h.MemoryMB), nullableFloat(h.DiskGB),
 			nullableString(h.Application), nullableString(h.Category),
@@ -201,14 +229,16 @@ func (s *Store) InsertHosts(runID int64, hosts []model.Host) error {
 
 // GetHosts returns hosts from the latest run, with optional filters.
 func (s *Store) GetHosts(filter model.HostFilter) ([]model.Host, error) {
-	query := `SELECT id, run_id, name, source, host_type, status, zone, tailscale_ip,
+	runIDQuery := `(SELECT MAX(id) FROM collection_runs WHERE status = 'completed')`
+
+	query := `SELECT id, run_id, name, sources, host_type, status, zone, tailscale_ip,
 		local_ip, public_ipv4, cpu_cores, memory_mb, disk_gb, application, category,
 		monthly_cost_eur, details
-		FROM hosts WHERE run_id = (SELECT MAX(id) FROM collection_runs WHERE status = 'completed')`
+		FROM hosts WHERE run_id = ` + runIDQuery
 
 	var args []any
 	if filter.Source != "" {
-		query += " AND source = ?"
+		query += ` AND sources LIKE '%"' || ? || '"%'`
 		args = append(args, filter.Source)
 	}
 	if filter.Zone != "" {
@@ -225,8 +255,8 @@ func (s *Store) GetHosts(filter model.HostFilter) ([]model.Host, error) {
 	}
 	if filter.Search != "" {
 		query += " AND (name LIKE ? OR application LIKE ? OR tailscale_ip LIKE ?)"
-		s := "%" + filter.Search + "%"
-		args = append(args, s, s, s)
+		search := "%" + filter.Search + "%"
+		args = append(args, search, search, search)
 	}
 	query += " ORDER BY name"
 
@@ -235,12 +265,52 @@ func (s *Store) GetHosts(filter model.HostFilter) ([]model.Host, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanHosts(rows)
+
+	hosts, err := scanHosts(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Populate service counts
+	if err := s.populateServiceCounts(runIDQuery, hosts); err != nil {
+		return nil, err
+	}
+
+	return hosts, nil
+}
+
+// populateServiceCounts fills ServiceCount on each host from the services table.
+func (s *Store) populateServiceCounts(runIDQuery string, hosts []model.Host) error {
+	if len(hosts) == 0 {
+		return nil
+	}
+
+	rows, err := s.db.Query(`SELECT host_name, COUNT(*) FROM services
+		WHERE run_id = ` + runIDQuery + ` GROUP BY host_name`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var name string
+		var count int
+		if err := rows.Scan(&name, &count); err != nil {
+			return err
+		}
+		counts[name] = count
+	}
+
+	for i := range hosts {
+		hosts[i].ServiceCount = counts[hosts[i].Name]
+	}
+	return rows.Err()
 }
 
 // GetHost returns a single host by name from the latest run.
 func (s *Store) GetHost(name string) (*model.Host, error) {
-	row := s.db.QueryRow(`SELECT id, run_id, name, source, host_type, status, zone, tailscale_ip,
+	row := s.db.QueryRow(`SELECT id, run_id, name, sources, host_type, status, zone, tailscale_ip,
 		local_ip, public_ipv4, cpu_cores, memory_mb, disk_gb, application, category,
 		monthly_cost_eur, details
 		FROM hosts
@@ -668,15 +738,18 @@ func (s *Store) GetSummary() (*model.Summary, error) {
 	s.db.QueryRow("SELECT COUNT(*) FROM findings WHERE run_id = ?", runID).Scan(&summary.TotalFindings)
 	s.db.QueryRow("SELECT COALESCE(SUM(monthly_cost_eur), 0) FROM hosts WHERE run_id = ?", runID).Scan(&summary.MonthlyCostEUR)
 
-	// By source
-	rows, _ := s.db.Query("SELECT source, COUNT(*) FROM hosts WHERE run_id = ? GROUP BY source", runID)
+	// By source — each host may have multiple sources, count per source
+	rows, _ := s.db.Query("SELECT sources FROM hosts WHERE run_id = ?", runID)
 	if rows != nil {
 		defer rows.Close()
 		for rows.Next() {
-			var src string
-			var cnt int
-			rows.Scan(&src, &cnt)
-			summary.HostsBySource[src] = cnt
+			var sourcesStr string
+			rows.Scan(&sourcesStr)
+			var sources []string
+			json.Unmarshal([]byte(sourcesStr), &sources)
+			for _, src := range sources {
+				summary.HostsBySource[src]++
+			}
 		}
 	}
 
@@ -874,14 +947,16 @@ func scanHosts(rows *sql.Rows) ([]model.Host, error) {
 	var hosts []model.Host
 	for rows.Next() {
 		var h model.Host
+		var sourcesStr string
 		var zone, tsIP, localIP, pubIP, app, cat, details sql.NullString
 		var cpu, mem sql.NullInt64
 		var disk, cost sql.NullFloat64
 
-		if err := rows.Scan(&h.ID, &h.RunID, &h.Name, &h.Source, &h.HostType, &h.Status,
+		if err := rows.Scan(&h.ID, &h.RunID, &h.Name, &sourcesStr, &h.HostType, &h.Status,
 			&zone, &tsIP, &localIP, &pubIP, &cpu, &mem, &disk, &app, &cat, &cost, &details); err != nil {
 			return nil, err
 		}
+		json.Unmarshal([]byte(sourcesStr), &h.Sources)
 		h.Zone = zone.String
 		h.TailscaleIP = tsIP.String
 		h.LocalIP = localIP.String
@@ -903,17 +978,19 @@ func scanHosts(rows *sql.Rows) ([]model.Host, error) {
 
 func scanHost(row *sql.Row) (*model.Host, error) {
 	var h model.Host
+	var sourcesStr string
 	var zone, tsIP, localIP, pubIP, app, cat, details sql.NullString
 	var cpu, mem sql.NullInt64
 	var disk, cost sql.NullFloat64
 
-	if err := row.Scan(&h.ID, &h.RunID, &h.Name, &h.Source, &h.HostType, &h.Status,
+	if err := row.Scan(&h.ID, &h.RunID, &h.Name, &sourcesStr, &h.HostType, &h.Status,
 		&zone, &tsIP, &localIP, &pubIP, &cpu, &mem, &disk, &app, &cat, &cost, &details); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
+	json.Unmarshal([]byte(sourcesStr), &h.Sources)
 	h.Zone = zone.String
 	h.TailscaleIP = tsIP.String
 	h.LocalIP = localIP.String
