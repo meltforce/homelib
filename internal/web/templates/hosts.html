@@ -1,0 +1,27 @@
+{{define "content"}}
+<h1>Hosts</h1>
+
+<form hx-get="/hosts" hx-target="#hosts-table" hx-swap="innerHTML" hx-push-url="true">
+  <div class="grid">
+    <input type="search" name="q" placeholder="Search hosts..." value="{{.Filter.Search}}">
+    <select name="source">
+      <option value="">All Sources</option>
+      <option value="proxmox" {{if eq .Filter.Source "proxmox"}}selected{{end}}>Proxmox</option>
+      <option value="tailscale" {{if eq .Filter.Source "tailscale"}}selected{{end}}>Tailscale</option>
+      <option value="hetzner" {{if eq .Filter.Source "hetzner"}}selected{{end}}>Hetzner</option>
+      <option value="unifi" {{if eq .Filter.Source "unifi"}}selected{{end}}>UniFi</option>
+    </select>
+    <select name="zone">
+      <option value="">All Zones</option>
+      <option value="homelab" {{if eq .Filter.Zone "homelab"}}selected{{end}}>Homelab</option>
+      <option value="private-cloud" {{if eq .Filter.Zone "private-cloud"}}selected{{end}}>Private Cloud</option>
+      <option value="public-cloud" {{if eq .Filter.Zone "public-cloud"}}selected{{end}}>Public Cloud</option>
+    </select>
+    <button type="submit">Filter</button>
+  </div>
+</form>
+
+<div id="hosts-table">
+{{template "hosts_table" .}}
+</div>
+{{end}}

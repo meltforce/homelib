@@ -1,0 +1,73 @@
+{{define "content"}}
+<h1>Dashboard</h1>
+
+{{with .Summary}}
+<div class="grid-stats">
+  <article class="stat-card">
+    <h2>{{.TotalHosts}}</h2>
+    <small>Total Hosts</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.OnlineHosts}}</h2>
+    <small>Online</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.TotalServices}}</h2>
+    <small>Services</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.TotalNetworks}}</h2>
+    <small>Networks</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.TotalFindings}}</h2>
+    <small>Findings</small>
+  </article>
+</div>
+
+{{if gt .MonthlyCostEUR 0.0}}
+<p>Monthly cost: <strong>{{printf "%.2f" .MonthlyCostEUR}} EUR</strong></p>
+{{end}}
+
+<div class="grid">
+  <article>
+    <header>Hosts by Source</header>
+    {{range $source, $count := .HostsBySource}}
+    <p>{{$source}}: <strong>{{$count}}</strong></p>
+    {{end}}
+  </article>
+  <article>
+    <header>Hosts by Zone</header>
+    {{range $zone, $count := .HostsByZone}}
+    <p>{{$zone}}: <strong>{{$count}}</strong></p>
+    {{end}}
+  </article>
+</div>
+
+{{with .LastCollection}}
+<article>
+  <header>Last Collection</header>
+  <p>Status: <span class="badge badge-{{if eq .Status "completed"}}green{{else if eq .Status "failed"}}red{{else}}grey{{end}}">{{.Status}}</span></p>
+  <p>Started: {{.StartedAt.Format "2006-01-02 15:04:05"}}</p>
+  {{if gt .DurationMs 0}}<p>Duration: {{.DurationMs}}ms</p>{{end}}
+</article>
+{{end}}
+{{end}}
+
+{{if .Findings}}
+<h2>Recent Findings</h2>
+<table>
+  <thead><tr><th>Severity</th><th>Source</th><th>Host</th><th>Message</th></tr></thead>
+  <tbody>
+  {{range .Findings}}
+  <tr>
+    <td><span class="badge badge-{{if eq .Severity "error"}}red{{else if eq .Severity "warning"}}yellow{{else}}grey{{end}}">{{.Severity}}</span></td>
+    <td>{{.Source}}</td>
+    <td>{{.HostName}}</td>
+    <td>{{.Message}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

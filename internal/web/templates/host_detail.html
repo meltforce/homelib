@@ -1,0 +1,53 @@
+{{define "content"}}
+{{with .Host}}
+<hgroup>
+  <h1>{{.Name}}</h1>
+  <p>{{.Source}} / {{.HostType}} — <span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span></p>
+</hgroup>
+
+<div class="grid">
+  <article>
+    <header>Identity</header>
+    <dl>
+      <dt>Zone</dt><dd>{{.Zone}}</dd>
+      <dt>Application</dt><dd>{{.Application}}</dd>
+      <dt>Category</dt><dd>{{.Category}}</dd>
+    </dl>
+  </article>
+  <article>
+    <header>Network</header>
+    <dl>
+      {{if .TailscaleIP}}<dt>Tailscale IP</dt><dd>{{.TailscaleIP}}</dd>{{end}}
+      {{if .LocalIP}}<dt>Local IP</dt><dd>{{.LocalIP}}</dd>{{end}}
+      {{if .PublicIPv4}}<dt>Public IPv4</dt><dd>{{.PublicIPv4}}</dd>{{end}}
+    </dl>
+  </article>
+  <article>
+    <header>Resources</header>
+    <dl>
+      {{if gt .CPUCores 0}}<dt>CPU Cores</dt><dd>{{.CPUCores}}</dd>{{end}}
+      {{if gt .MemoryMB 0}}<dt>Memory</dt><dd>{{formatMB .MemoryMB}}</dd>{{end}}
+      {{if gt .DiskGB 0.0}}<dt>Disk</dt><dd>{{formatGB .DiskGB}}</dd>{{end}}
+      {{if gt .MonthlyCostEUR 0.0}}<dt>Monthly Cost</dt><dd>{{printf "%.2f" .MonthlyCostEUR}} EUR</dd>{{end}}
+    </dl>
+  </article>
+</div>
+{{end}}
+
+{{if .Services}}
+<h2>Services</h2>
+<table>
+  <thead><tr><th>Service</th><th>Container</th><th>Image</th><th>Stack</th></tr></thead>
+  <tbody>
+  {{range .Services}}
+    <tr>
+      <td>{{.ServiceName}}</td>
+      <td>{{.ContainerName}}</td>
+      <td>{{.Image}}</td>
+      <td>{{.StackName}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}

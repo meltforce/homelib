@@ -1,0 +1,19 @@
+{{define "content"}}
+<h1>Services</h1>
+<table>
+  <thead><tr><th>Host</th><th>Stack</th><th>Service</th><th>Container</th><th>Image</th></tr></thead>
+  <tbody>
+  {{range .Services}}
+    <tr>
+      <td><a href="/hosts/{{.HostName}}">{{.HostName}}</a></td>
+      <td>{{.StackName}}</td>
+      <td>{{.ServiceName}}</td>
+      <td>{{.ContainerName}}</td>
+      <td>{{.Image}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="5">No services found.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}

@@ -1,0 +1,19 @@
+{{define "content"}}
+<h1>Networks</h1>
+<table>
+  <thead><tr><th>Name</th><th>VLAN</th><th>Subnet</th><th>Gateway</th><th>DHCP</th></tr></thead>
+  <tbody>
+  {{range .Networks}}
+    <tr>
+      <td>{{.Name}}</td>
+      <td>{{if gt .VLANID 0}}{{.VLANID}}{{end}}</td>
+      <td>{{.Subnet}}</td>
+      <td>{{.Gateway}}</td>
+      <td>{{if .DHCPEnabled}}Yes{{else}}No{{end}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="5">No networks found.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}

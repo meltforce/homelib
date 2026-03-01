@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>Collections</h1>
+
+<form method="POST" action="/collections/trigger">
+  <button type="submit" {{if eq .Progress.Status "running"}}disabled aria-busy="true"{{end}}>
+    {{if eq .Progress.Status "running"}}Collection Running...{{else}}Trigger Collection{{end}}
+  </button>
+</form>
+
+{{if eq .Progress.Status "running"}}
+<article aria-busy="true">
+  <header>Collection in Progress</header>
+  {{range $name, $src := .Progress.Sources}}
+  <p>{{$name}}: <span class="badge badge-{{if eq $src.Status "completed"}}green{{else if eq $src.Status "failed"}}red{{else}}grey{{end}}">{{$src.Status}}</span>
+    {{if $src.Error}}<small> — {{$src.Error}}</small>{{end}}
+  </p>
+  {{end}}
+</article>
+{{end}}
+
+<h2>History</h2>
+<table>
+  <thead><tr><th>ID</th><th>Started</th><th>Status</th><th>Duration</th></tr></thead>
+  <tbody>
+  {{range .Runs}}
+    <tr>
+      <td>{{.ID}}</td>
+      <td>{{.StartedAt.Format "2006-01-02 15:04:05"}}</td>
+      <td><span class="badge badge-{{if eq .Status "completed"}}green{{else if eq .Status "failed"}}red{{else}}grey{{end}}">{{.Status}}</span></td>
+      <td>{{if gt .DurationMs 0}}{{.DurationMs}}ms{{end}}</td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4">No collection runs yet.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
