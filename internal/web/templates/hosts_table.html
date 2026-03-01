@@ -8,6 +8,7 @@
       <th>Status</th>
       <th>Zone</th>
       <th>Tailscale IP</th>
+      <th>Local IP</th>
       <th>CPU</th>
       <th>Memory</th>
       <th>Application</th>
@@ -22,12 +23,13 @@
       <td><span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span></td>
       <td>{{.Zone}}</td>
       <td>{{.TailscaleIP}}</td>
+      <td>{{.LocalIP}}</td>
       <td>{{if gt .CPUCores 0}}{{.CPUCores}}{{end}}</td>
       <td>{{if gt .MemoryMB 0}}{{formatMB .MemoryMB}}{{end}}</td>
       <td>{{.Application}}</td>
     </tr>
   {{else}}
-    <tr><td colspan="9">No hosts found.</td></tr>
+    <tr><td colspan="10">No hosts found.</td></tr>
   {{end}}
   </tbody>
 </table>

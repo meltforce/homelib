@@ -104,8 +104,10 @@ func mergeGroup(hosts []*model.Host) model.Host {
 			merged.Status = h.Status
 		}
 
-		// Zone: first non-empty
-		if merged.Zone == "" && h.Zone != "" {
+		// Zone: first non-empty, non-"unknown"
+		if (merged.Zone == "" || merged.Zone == "unknown") && h.Zone != "" && h.Zone != "unknown" {
+			merged.Zone = h.Zone
+		} else if merged.Zone == "" && h.Zone != "" {
 			merged.Zone = h.Zone
 		}
 
