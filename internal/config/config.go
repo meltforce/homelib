@@ -1,26 +1,37 @@
 package config
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/tailscale/setec/client/setec"
 	"gopkg.in/yaml.v3"
 )
 
 // Config is the top-level configuration.
 type Config struct {
-	Service    ServiceConfig              `yaml:"service"`
-	Schedule   ScheduleConfig             `yaml:"schedule"`
-	Secrets    map[string]string          `yaml:"secrets"`
-	Collectors CollectorsConfig           `yaml:"collectors"`
-	Plugins    []PluginConfig             `yaml:"plugins"`
-	Roles      RolesConfig                `yaml:"roles"`
+	Service       ServiceConfig              `yaml:"service"`
+	Schedule      ScheduleConfig             `yaml:"schedule"`
+	SecretBackend SecretBackendConfig        `yaml:"secret_backend"`
+	Secrets       map[string]string          `yaml:"secrets"`
+	Collectors    CollectorsConfig           `yaml:"collectors"`
+	Plugins       []PluginConfig             `yaml:"plugins"`
+	Roles         RolesConfig                `yaml:"roles"`
 
 	// resolved secrets cache
 	resolvedSecrets map[string]string
+	// runtime setec store (not serialized)
+	setecStore *setec.Store
+}
+
+type SecretBackendConfig struct {
+	Type     string `yaml:"type"`      // "setec" or "" (empty = legacy op:// behavior)
+	SetecURL string `yaml:"setec_url"` // e.g. "https://setec.leo-royal.ts.net"
 }
 
 type ServiceConfig struct {
@@ -133,10 +144,38 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
+// InitSetecStore initializes the setec secret store if configured.
+// It pre-declares all non-empty secret values as setec secret names and blocks
+// until all are fetched, providing fail-fast behavior.
+func (c *Config) InitSetecStore(ctx context.Context, httpClient *http.Client) error {
+	if c.SecretBackend.Type != "setec" {
+		return nil
+	}
+	var names []string
+	for _, v := range c.Secrets {
+		if v != "" {
+			names = append(names, v)
+		}
+	}
+	store, err := setec.NewStore(ctx, setec.StoreConfig{
+		Client: setec.Client{
+			Server: c.SecretBackend.SetecURL,
+			DoHTTP: httpClient.Do,
+		},
+		Secrets: names,
+	})
+	if err != nil {
+		return fmt.Errorf("init setec store: %w", err)
+	}
+	c.setecStore = store
+	return nil
+}
+
 // ResolveSecret resolves a secret by key using the priority chain:
 // 1. Environment variable HOMELIB_<UPPER_KEY>
-// 2. op:// reference (if OP_SERVICE_ACCOUNT_TOKEN is set)
-// 3. Literal value from config
+// 2. setec store (if configured)
+// 3. op:// reference (if OP_SERVICE_ACCOUNT_TOKEN is set)
+// 4. Literal value from config
 func (c *Config) ResolveSecret(key string) (string, error) {
 	if v, ok := c.resolvedSecrets[key]; ok {
 		return v, nil
@@ -154,7 +193,15 @@ func (c *Config) ResolveSecret(key string) (string, error) {
 		return "", fmt.Errorf("secret %q not configured", key)
 	}
 
-	// 2. op:// reference
+	// 2. setec store lookup
+	if c.setecStore != nil && raw != "" {
+		if v := c.setecStore.Secret(raw).GetString(); v != "" {
+			c.resolvedSecrets[key] = v
+			return v, nil
+		}
+	}
+
+	// 3. op:// reference
 	if strings.HasPrefix(raw, "op://") {
 		v, err := resolveOP(raw)
 		if err != nil {
@@ -164,7 +211,7 @@ func (c *Config) ResolveSecret(key string) (string, error) {
 		return v, nil
 	}
 
-	// 3. Literal value
+	// 4. Literal value
 	c.resolvedSecrets[key] = raw
 	return raw, nil
 }

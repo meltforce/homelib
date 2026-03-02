@@ -8,11 +8,23 @@ schedule:
   cron: "0 6,18 * * *"          # Collection schedule (2x daily)
   retention_days: 30             # Keep old runs for N days
 
-# Secrets: op:// reference, environment variable, or literal value
-# Resolution order:
+# Secret backend: "setec" uses Tailscale's secret manager (requires tsnet).
+# Omit or leave type empty to use the legacy op:// behavior.
+# secret_backend:
+#   type: setec
+#   setec_url: https://setec.leo-royal.ts.net
+
+# Secrets: resolution order depends on backend:
 #   1. Environment variable HOMELIB_<UPPER_KEY>
-#   2. op:// via OP_SERVICE_ACCOUNT_TOKEN
-#   3. Literal value in config
+#   2. setec store (if secret_backend.type is "setec" — values are setec secret names)
+#   3. op:// via OP_SERVICE_ACCOUNT_TOKEN (if value starts with op://)
+#   4. Literal value in config
+#
+# With setec backend, values are setec secret names:
+#   hetzner_api_token: "homelib/hetzner-api-token"
+#   komodo_api_key: "homelib/komodo-api-key"
+#   ...
+# With op:// backend (default), values are 1Password references:
 secrets:
   hetzner_api_token: "op://Homelab/hetzner-api/credential"
   komodo_api_key: "op://Homelab/komodo-api/Benutzername"

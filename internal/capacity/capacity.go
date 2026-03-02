@@ -25,7 +25,7 @@ func ComputeCapacity(hosts []model.Host) *model.CapacityReport {
 			if parent != "" {
 				guestsByNode[parent] = append(guestsByNode[parent], h)
 			}
-		case "cloud", "device":
+		case "cloud":
 			standaloneHosts = append(standaloneHosts, h)
 		}
 	}
@@ -50,6 +50,9 @@ func ComputeCapacity(hosts []model.Host) *model.CapacityReport {
 		}
 
 		for _, g := range guests {
+			if g.Status == "stopped" {
+				continue
+			}
 			nc.AllocCPU += g.CPUCores
 			nc.AllocMemoryMB += g.MemoryMB
 			nc.AllocDiskGB += g.DiskGB

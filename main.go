@@ -55,12 +55,70 @@ func main() {
 	}
 	defer st.Close()
 
+	// Start tsnet / get listener (moved before collectors so setec can use tsnet dial)
+	var ln net.Listener
+	var localClient *tailscale.LocalClient
+	var tsnetHTTPClient *http.Client
+
+	if *localMode {
+		// Local development mode
+		ln, err = net.Listen("tcp", *localAddr)
+		if err != nil {
+			log.Error("listen", "error", err)
+			os.Exit(1)
+		}
+		log.Info("listening (local mode)", "addr", *localAddr)
+		tsnetHTTPClient = http.DefaultClient
+	} else {
+		// tsnet mode
+		tsnetSrv := &tsnet.Server{
+			Hostname: cfg.Service.Hostname,
+			Dir:      cfg.Service.StateDir,
+		}
+
+		// Set auth key if available (from env var, not in setec)
+		if authKey, err := cfg.ResolveSecret("ts_auth_key"); err == nil && authKey != "" {
+			tsnetSrv.AuthKey = authKey
+		}
+
+		if err := tsnetSrv.Start(); err != nil {
+			log.Error("tsnet start", "error", err)
+			os.Exit(1)
+		}
+		defer tsnetSrv.Close()
+
+		localClient, err = tsnetSrv.LocalClient()
+		if err != nil {
+			log.Error("tsnet local client", "error", err)
+			os.Exit(1)
+		}
+
+		tsnetHTTPClient = &http.Client{
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return tsnetSrv.Dial(ctx, network, addr)
+				},
+			},
+		}
+
+		ln, err = tsnetSrv.ListenTLS("tcp", ":443")
+		if err != nil {
+			log.Error("tsnet listen", "error", err)
+			os.Exit(1)
+		}
+		log.Info("listening on tsnet", "hostname", cfg.Service.Hostname)
+	}
+
+	// Init setec store (uses tsnet HTTP client to reach setec over Tailscale)
+	if err := cfg.InitSetecStore(context.Background(), tsnetHTTPClient); err != nil {
+		log.Error("init setec store", "error", err)
+		os.Exit(1)
+	}
+
 	// Create orchestrator
 	orch := collector.NewOrchestrator(cfg, st, log)
 
 	// Register collectors based on config
-	var localClient *tailscale.LocalClient // Will be set if using tsnet
-
 	if cfg.Collectors.Proxmox.Enabled {
 		orch.Register(collector.NewProxmoxCollector(cfg.Collectors.Proxmox, log))
 	}
@@ -72,6 +130,13 @@ func main() {
 	}
 	if cfg.Collectors.UniFi.Enabled {
 		orch.Register(collector.NewUniFiCollector(cfg.Collectors.UniFi, cfg, log))
+	}
+	if cfg.Collectors.Tailscale.Enabled {
+		if localClient != nil {
+			orch.Register(collector.NewTailscaleCollector(cfg.Collectors.Tailscale, cfg, localClient, log))
+		} else if *localMode {
+			log.Warn("tailscale collector disabled in local mode (no tsnet)")
+		}
 	}
 
 	// Register plugins
@@ -99,58 +164,6 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", mcpHandler)
 	mux.Handle("/", srv.Handler())
-
-	// Get listener: tsnet or local
-	var ln net.Listener
-
-	if *localMode {
-		// Local development mode
-		ln, err = net.Listen("tcp", *localAddr)
-		if err != nil {
-			log.Error("listen", "error", err)
-			os.Exit(1)
-		}
-		log.Info("listening (local mode)", "addr", *localAddr)
-	} else {
-		// tsnet mode
-		tsnetSrv := &tsnet.Server{
-			Hostname: cfg.Service.Hostname,
-			Dir:      cfg.Service.StateDir,
-		}
-
-		// Set auth key if available
-		if authKey, err := cfg.ResolveSecret("ts_auth_key"); err == nil && authKey != "" {
-			tsnetSrv.AuthKey = authKey
-		}
-
-		if err := tsnetSrv.Start(); err != nil {
-			log.Error("tsnet start", "error", err)
-			os.Exit(1)
-		}
-		defer tsnetSrv.Close()
-
-		localClient, err = tsnetSrv.LocalClient()
-		if err != nil {
-			log.Error("tsnet local client", "error", err)
-			os.Exit(1)
-		}
-
-		ln, err = tsnetSrv.ListenTLS("tcp", ":443")
-		if err != nil {
-			log.Error("tsnet listen", "error", err)
-			os.Exit(1)
-		}
-		log.Info("listening on tsnet", "hostname", cfg.Service.Hostname)
-	}
-
-	// Register Tailscale collector (needs localClient from tsnet)
-	if cfg.Collectors.Tailscale.Enabled {
-		if localClient != nil {
-			orch.Register(collector.NewTailscaleCollector(cfg.Collectors.Tailscale, cfg, localClient, log))
-		} else if *localMode {
-			log.Warn("tailscale collector disabled in local mode (no tsnet)")
-		}
-	}
 
 	// Start scheduler
 	sched := scheduler.New(log)
