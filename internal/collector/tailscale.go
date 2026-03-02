@@ -9,8 +9,11 @@ import (
 	"net/netip"
 	"strings"
 
+	"io"
+
 	"github.com/meltforce/homelib/internal/config"
 	"github.com/meltforce/homelib/internal/model"
+	"github.com/tailscale/hujson"
 	"tailscale.com/client/tailscale"
 	"tailscale.com/types/views"
 )
@@ -177,8 +180,31 @@ func (t *TailscaleCollector) collectControlPlane(ctx context.Context, result *mo
 	// Determine tailnet name from self status
 	tailnet := "-" // Use "-" for the authenticated user's tailnet
 
-	// ACL Policy
-	aclData, err := doGet("/tailnet/" + tailnet + "/acl")
+	// ACL Policy (returns HuJSON with comments — standardize to JSON)
+	aclData, err := func() (json.RawMessage, error) {
+		req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/tailnet/"+tailnet+"/acl", nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("HTTP %d for /acl", resp.StatusCode)
+		}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		standard, err := hujson.Standardize(body)
+		if err != nil {
+			return nil, fmt.Errorf("standardize HuJSON: %w", err)
+		}
+		return json.RawMessage(standard), nil
+	}()
 	if err != nil {
 		t.log.Warn("failed to fetch ACL", "error", err)
 	} else {
