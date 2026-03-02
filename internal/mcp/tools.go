@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/meltforce/homelib/internal/capacity"
 	"github.com/meltforce/homelib/internal/model"
 )
 
@@ -159,6 +160,38 @@ func (t *Tools) handleTriggerCollection(ctx context.Context, req mcp.CallToolReq
 // stringArg extracts a string argument from the request.
 func stringArg(req mcp.CallToolRequest, name string) string {
 	return req.GetString(name, "")
+}
+
+func (t *Tools) handleGetCapacity(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	hosts, err := t.store.GetHosts(model.HostFilter{})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to get hosts: %v", err)), nil
+	}
+
+	report := capacity.ComputeCapacity(hosts)
+
+	nodeFilter := stringArg(req, "node")
+	zoneFilter := stringArg(req, "zone")
+
+	if nodeFilter != "" {
+		for _, n := range report.Nodes {
+			if n.Name == nodeFilter {
+				return jsonResult(n)
+			}
+		}
+		return mcp.NewToolResultError(fmt.Sprintf("node %q not found", nodeFilter)), nil
+	}
+
+	if zoneFilter != "" {
+		for _, z := range report.Zones {
+			if z.Zone == zoneFilter {
+				return jsonResult(z)
+			}
+		}
+		return mcp.NewToolResultError(fmt.Sprintf("zone %q not found", zoneFilter)), nil
+	}
+
+	return jsonResult(report)
 }
 
 // jsonResult creates a text result with JSON content.

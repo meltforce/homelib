@@ -1,5 +1,6 @@
 {{define "content"}}
 {{with .Host}}
+<p><a href="javascript:void(0)" onclick="history.length>1?history.back():location='/hosts'">← Back to Hosts</a></p>
 <hgroup>
   <h1>{{.Name}}</h1>
   <p>{{.SourcesString}} / {{.HostType}} — <span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span></p>

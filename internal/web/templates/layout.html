@@ -26,11 +26,12 @@
 <body>
   <nav class="container-fluid">
     <ul>
-      <li><strong>homelib</strong></li>
+      <li><a href="/"><strong>homelib</strong></a></li>
     </ul>
     <ul>
       <li><a href="/" {{if eq .Active "dashboard"}}class="active"{{end}}>Dashboard</a></li>
       <li><a href="/hosts" {{if eq .Active "hosts"}}class="active"{{end}}>Hosts</a></li>
+      <li><a href="/capacity" {{if eq .Active "capacity"}}class="active"{{end}}>Capacity</a></li>
       <li><a href="/services" {{if eq .Active "services"}}class="active"{{end}}>Services</a></li>
       <li><a href="/networks" {{if eq .Active "networks"}}class="active"{{end}}>Networks</a></li>
       <li><a href="/tailscale" {{if eq .Active "tailscale"}}class="active"{{end}}>Tailscale</a></li>

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/meltforce/homelib/internal/capacity"
 	"github.com/meltforce/homelib/internal/model"
 )
 
@@ -113,4 +114,15 @@ func (s *Server) handleAPITrigger(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	s.writeJSON(w, map[string]string{"status": "started"})
+}
+
+func (s *Server) handleAPICapacity(w http.ResponseWriter, r *http.Request) {
+	hosts, err := s.store.GetHosts(model.HostFilter{})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	report := capacity.ComputeCapacity(hosts)
+	s.writeJSON(w, report)
 }

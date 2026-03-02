@@ -1,0 +1,83 @@
+#!/bin/bash
+# pve-efficiency — RAM/CPU efficiency analysis for Proxmox guests
+# Runs on the Proxmox host, outputs PluginOutput JSON for homelib.
+# Requires: pvesh, python3
+
+set -euo pipefail
+
+usage() {
+    echo "Usage: pve-efficiency --json" >&2
+    exit 1
+}
+
+[[ "${1:-}" == "--json" ]] || usage
+
+# Fetch cluster resources for VMs and CTs
+vm_data=$(pvesh get /cluster/resources --type vm --output-format json 2>/dev/null || echo "[]")
+
+python3 -c "
+import json, sys
+
+data = json.loads('''$vm_data''')
+
+findings = []
+total = 0
+oversized = 0
+undersized = 0
+optimal = 0
+
+for guest in data:
+    status = guest.get('status', '')
+    if status != 'running':
+        continue
+
+    name = guest.get('name', guest.get('vmid', 'unknown'))
+    maxmem = guest.get('maxmem', 0)
+    mem = guest.get('mem', 0)
+    cpu_usage = guest.get('cpu', 0)
+    maxcpu = guest.get('maxcpu', 1)
+
+    if maxmem == 0:
+        continue
+
+    total += 1
+    mem_pct = (mem / maxmem) * 100
+    maxmem_mb = maxmem // (1024 * 1024)
+    mem_mb = mem // (1024 * 1024)
+
+    if mem_pct < 30:
+        oversized += 1
+        findings.append({
+            'severity': 'warning',
+            'host_name': name,
+            'message': f'{mem_mb}MB / {maxmem_mb}MB ({mem_pct:.0f}%) memory used — oversized, consider reducing'
+        })
+    elif mem_pct > 90:
+        undersized += 1
+        findings.append({
+            'severity': 'warning',
+            'host_name': name,
+            'message': f'{mem_mb}MB / {maxmem_mb}MB ({mem_pct:.0f}%) memory used — undersized, consider increasing'
+        })
+    else:
+        optimal += 1
+        findings.append({
+            'severity': 'info',
+            'host_name': name,
+            'message': f'{mem_mb}MB / {maxmem_mb}MB ({mem_pct:.0f}%) memory used — properly sized'
+        })
+
+output = {
+    'plugin': 'pve-efficiency',
+    'version': '1.0.0',
+    'metrics': {
+        'total_guests': total,
+        'oversized': oversized,
+        'undersized': undersized,
+        'optimal': optimal
+    },
+    'findings': findings
+}
+
+json.dump(output, sys.stdout, indent=2)
+"

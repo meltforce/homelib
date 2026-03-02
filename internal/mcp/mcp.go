@@ -87,6 +87,12 @@ func (t *Tools) Register(s *server.MCPServer) {
 		mcp.WithDescription("Get the status of the latest or currently running collection."),
 	), t.handleGetCollectionStatus)
 
+	s.AddTool(mcp.NewTool("get_capacity",
+		mcp.WithDescription("Get capacity planning data: per-node CPU/memory allocation, free resources, zone summaries. Use to answer 'where should I deploy X?' or 'what resources are free?'"),
+		mcp.WithString("zone", mcp.Description("Filter by zone: homelab, private-cloud, public-cloud")),
+		mcp.WithString("node", mcp.Description("Filter by node name to get just that node's capacity")),
+	), t.handleGetCapacity)
+
 	s.AddTool(mcp.NewTool("trigger_collection",
 		mcp.WithDescription("Start a new inventory collection run."),
 	), t.handleTriggerCollection)

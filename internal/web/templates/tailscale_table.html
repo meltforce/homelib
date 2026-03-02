@@ -1,0 +1,24 @@
+{{define "tailscale_table"}}
+<table>
+  <thead>
+    <tr>
+      <th>Source</th>
+      <th>Destination</th>
+      <th>Ports</th>
+      <th>Type</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Dataflows}}
+    <tr>
+      <td>{{.Source}}</td>
+      <td>{{.Dest}}</td>
+      <td><code>{{.Ports}}</code></td>
+      <td><span class="badge badge-{{if eq .Type "network"}}green{{else}}grey{{end}}">{{.Type}}</span></td>
+    </tr>
+  {{else}}
+    <tr><td colspan="4">No dataflows found.</td></tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}

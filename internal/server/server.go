@@ -48,8 +48,8 @@ func New(st *store.Store, orch *collector.Orchestrator, log *slog.Logger) (*Serv
 		return nil, fmt.Errorf("parse layout: %w", err)
 	}
 
-	// Also parse the hosts_table partial into layout
-	layout, err = layout.ParseFS(tmplFS, "hosts_table.html")
+	// Also parse partials into layout
+	layout, err = layout.ParseFS(tmplFS, "hosts_table.html", "tailscale_table.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse partials: %w", err)
 	}
@@ -60,6 +60,7 @@ func New(st *store.Store, orch *collector.Orchestrator, log *slog.Logger) (*Serv
 		"host_detail.html",
 		"services.html",
 		"networks.html",
+		"capacity.html",
 		"tailscale.html",
 		"collections.html",
 	}
@@ -100,6 +101,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /services", s.handleServices)
 	mux.HandleFunc("GET /networks", s.handleNetworks)
 	mux.HandleFunc("GET /tailscale", s.handleTailscale)
+	mux.HandleFunc("GET /capacity", s.handleCapacity)
 	mux.HandleFunc("GET /collections", s.handleCollections)
 	mux.HandleFunc("POST /collections/trigger", s.handleTriggerCollection)
 
@@ -110,6 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/networks", s.handleAPINetworks)
 	mux.HandleFunc("GET /api/v1/findings", s.handleAPIFindings)
 	mux.HandleFunc("GET /api/v1/summary", s.handleAPISummary)
+	mux.HandleFunc("GET /api/v1/capacity", s.handleAPICapacity)
 	mux.HandleFunc("GET /api/v1/collections", s.handleAPICollections)
 	mux.HandleFunc("POST /api/v1/collections/trigger", s.handleAPITrigger)
 

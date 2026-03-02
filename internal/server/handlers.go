@@ -3,8 +3,11 @@ package server
 import (
 	"context"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/meltforce/homelib/internal/aclview"
+	"github.com/meltforce/homelib/internal/capacity"
 	"github.com/meltforce/homelib/internal/model"
 )
 
@@ -110,20 +113,73 @@ func (s *Server) handleNetworks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTailscale(w http.ResponseWriter, r *http.Request) {
-	var rows []aclview.DataflowRow
+	var allRows []aclview.DataflowRow
 
 	acl, err := s.store.GetTailscaleACL()
 	if err != nil {
 		s.log.Error("get tailscale ACL", "error", err)
 	} else if acl != nil {
-		rows = aclview.ParseDataflows(*acl)
+		allRows = aclview.ParseDataflows(*acl)
 	}
 
-	s.render(w, "tailscale.html", map[string]any{
+	filter := model.DataflowFilter{
+		Type:   r.URL.Query().Get("type"),
+		Search: r.URL.Query().Get("q"),
+	}
+
+	// Collect unique types for the dropdown (from unfiltered data)
+	typeSet := make(map[string]bool)
+	for _, row := range allRows {
+		typeSet[row.Type] = true
+	}
+	types := make([]string, 0, len(typeSet))
+	for t := range typeSet {
+		types = append(types, t)
+	}
+	sort.Strings(types)
+
+	// Apply filters
+	rows := filterDataflows(allRows, filter)
+
+	data := map[string]any{
 		"Title":     "Tailscale",
 		"Dataflows": rows,
+		"Types":     types,
+		"Filter":    filter,
 		"Active":    "tailscale",
-	})
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.renderPartial(w, "tailscale.html", "tailscale_table", data)
+		return
+	}
+
+	s.render(w, "tailscale.html", data)
+}
+
+func filterDataflows(rows []aclview.DataflowRow, f model.DataflowFilter) []aclview.DataflowRow {
+	if f.Type == "" && f.Search == "" {
+		return rows
+	}
+
+	var filtered []aclview.DataflowRow
+	search := strings.ToLower(f.Search)
+
+	for _, row := range rows {
+		if f.Type != "" && row.Type != f.Type {
+			continue
+		}
+		if search != "" {
+			if !strings.Contains(strings.ToLower(row.Source), search) &&
+				!strings.Contains(strings.ToLower(row.Dest), search) &&
+				!strings.Contains(strings.ToLower(row.Ports), search) &&
+				!strings.Contains(strings.ToLower(row.Type), search) {
+				continue
+			}
+		}
+		filtered = append(filtered, row)
+	}
+	return filtered
 }
 
 func (s *Server) handleCollections(w http.ResponseWriter, r *http.Request) {
@@ -150,4 +206,22 @@ func (s *Server) handleTriggerCollection(w http.ResponseWriter, r *http.Request)
 	}()
 
 	http.Redirect(w, r, "/collections", http.StatusSeeOther)
+}
+
+func (s *Server) handleCapacity(w http.ResponseWriter, r *http.Request) {
+	hosts, err := s.store.GetHosts(model.HostFilter{})
+	if err != nil {
+		s.log.Error("get hosts for capacity", "error", err)
+	}
+
+	report := capacity.ComputeCapacity(hosts)
+
+	findings, _ := s.store.GetFindings("plugin:pve-efficiency", "")
+
+	s.render(w, "capacity.html", map[string]any{
+		"Title":    "Capacity",
+		"Report":   report,
+		"Findings": findings,
+		"Active":   "capacity",
+	})
 }

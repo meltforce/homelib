@@ -199,6 +199,66 @@ type PluginFinding struct {
 	Message  string `json:"message"`
 }
 
+// NodeCapacity holds capacity data for a single hypervisor node.
+type NodeCapacity struct {
+	Name          string  `json:"name"`
+	Zone          string  `json:"zone"`
+	Status        string  `json:"status"`
+	TotalCPU      int     `json:"total_cpu"`
+	TotalMemoryMB int     `json:"total_memory_mb"`
+	AllocCPU      int     `json:"alloc_cpu"`
+	AllocMemoryMB int     `json:"alloc_memory_mb"`
+	AllocDiskGB   float64 `json:"alloc_disk_gb"`
+	FreeCPU       int     `json:"free_cpu"`
+	FreeMemoryMB  int     `json:"free_memory_mb"`
+	GuestCount    int     `json:"guest_count"`
+	Guests        []Host  `json:"guests"`
+}
+
+// CPUPercent returns CPU allocation as a percentage.
+func (n NodeCapacity) CPUPercent() int {
+	if n.TotalCPU == 0 {
+		return 0
+	}
+	return n.AllocCPU * 100 / n.TotalCPU
+}
+
+// MemPercent returns memory allocation as a percentage.
+func (n NodeCapacity) MemPercent() int {
+	if n.TotalMemoryMB == 0 {
+		return 0
+	}
+	return n.AllocMemoryMB * 100 / n.TotalMemoryMB
+}
+
+// ZoneCapacity aggregates capacity across nodes in a zone.
+type ZoneCapacity struct {
+	Zone          string `json:"zone"`
+	TotalCPU      int    `json:"total_cpu"`
+	TotalMemoryMB int    `json:"total_memory_mb"`
+	AllocCPU      int    `json:"alloc_cpu"`
+	AllocMemoryMB int    `json:"alloc_memory_mb"`
+	FreeCPU       int    `json:"free_cpu"`
+	FreeMemoryMB  int    `json:"free_memory_mb"`
+	NodeCount     int    `json:"node_count"`
+	GuestCount    int    `json:"guest_count"`
+}
+
+// CapacityReport is the full capacity planning report.
+type CapacityReport struct {
+	Nodes           []NodeCapacity `json:"nodes"`
+	Zones           []ZoneCapacity `json:"zones"`
+	StandaloneHosts []Host         `json:"standalone_hosts"`
+	TotalCPU        int            `json:"total_cpu"`
+	TotalMemoryMB   int            `json:"total_memory_mb"`
+	AllocCPU        int            `json:"alloc_cpu"`
+	AllocMemoryMB   int            `json:"alloc_memory_mb"`
+	FreeCPU         int            `json:"free_cpu"`
+	FreeMemoryMB    int            `json:"free_memory_mb"`
+	TotalNodes      int            `json:"total_nodes"`
+	TotalGuests     int            `json:"total_guests"`
+}
+
 // HostFilter for querying hosts.
 type HostFilter struct {
 	Source   string
@@ -206,6 +266,12 @@ type HostFilter struct {
 	Status   string
 	HostType string
 	Search   string
+}
+
+// DataflowFilter for querying tailscale ACL dataflows.
+type DataflowFilter struct {
+	Type   string
+	Search string
 }
 
 // Summary provides high-level inventory statistics.

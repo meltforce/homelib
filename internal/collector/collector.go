@@ -203,6 +203,9 @@ func (o *Orchestrator) Run(ctx context.Context) error {
 	cr := crossref.New(o.log)
 	mergedHosts, crFindings := cr.Run(mergedHosts)
 
+	// Apply role/application enrichment from config
+	mergedHosts = crossref.ApplyRoles(mergedHosts, o.cfg.Roles)
+
 	// Store merged hosts once
 	if len(mergedHosts) > 0 {
 		if err := o.store.InsertHosts(runID, mergedHosts); err != nil {

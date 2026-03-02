@@ -44,7 +44,7 @@ collectors:
 
 plugins:
   - name: pve-resources
-    enabled: true
+    enabled: false               # Capacity is computed natively from Proxmox host data
     description: "Proxmox capacity planning & resource overview"
     type: ssh
     host: dude
@@ -54,7 +54,7 @@ plugins:
     schedule: default
 
   - name: pve-efficiency
-    enabled: false               # Enable when --json is implemented
+    enabled: true
     description: "RAM efficiency analysis & right-sizing"
     type: ssh
     host: dude

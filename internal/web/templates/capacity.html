@@ -1,0 +1,115 @@
+{{define "content"}}
+<h1>Capacity</h1>
+
+{{with .Report}}
+<div class="grid-stats">
+  <article class="stat-card">
+    <h2>{{.TotalCPU}}</h2>
+    <small>Total vCPU</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.AllocCPU}}</h2>
+    <small>Allocated vCPU</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{formatMB .TotalMemoryMB}}</h2>
+    <small>Total Memory</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{formatMB .AllocMemoryMB}}</h2>
+    <small>Allocated Memory</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.TotalNodes}}</h2>
+    <small>Nodes</small>
+  </article>
+  <article class="stat-card">
+    <h2>{{.TotalGuests}}</h2>
+    <small>Guests</small>
+  </article>
+</div>
+
+{{range .Nodes}}
+<article>
+  <header>
+    <strong>{{.Name}}</strong>
+    <span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span>
+    — {{.Zone}} — {{.GuestCount}} guests
+  </header>
+
+  <div class="grid">
+    <div>
+      <small>CPU: {{.AllocCPU}} / {{.TotalCPU}} vCPU ({{.CPUPercent}}%)</small>
+      <progress value="{{.CPUPercent}}" max="100"></progress>
+    </div>
+    <div>
+      <small>Memory: {{formatMB .AllocMemoryMB}} / {{formatMB .TotalMemoryMB}} ({{.MemPercent}}%)</small>
+      <progress value="{{.MemPercent}}" max="100"></progress>
+    </div>
+  </div>
+
+  {{if .Guests}}
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Status</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Application</th></tr>
+    </thead>
+    <tbody>
+    {{range .Guests}}
+      <tr>
+        <td><a href="/hosts/{{.Name}}">{{.Name}}</a></td>
+        <td><span class="badge badge-grey">{{.HostType}}</span></td>
+        <td><span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span></td>
+        <td>{{.CPUCores}}</td>
+        <td>{{formatMB .MemoryMB}}</td>
+        <td>{{formatGB .DiskGB}}</td>
+        <td>{{.Application}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table>
+  {{end}}
+</article>
+{{end}}
+
+{{if .StandaloneHosts}}
+<h2>Standalone Hosts</h2>
+<table>
+  <thead>
+    <tr><th>Name</th><th>Type</th><th>Zone</th><th>Status</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Application</th><th>Cost/mo</th></tr>
+  </thead>
+  <tbody>
+  {{range .StandaloneHosts}}
+    <tr>
+      <td><a href="/hosts/{{.Name}}">{{.Name}}</a></td>
+      <td><span class="badge badge-grey">{{.HostType}}</span></td>
+      <td>{{.Zone}}</td>
+      <td><span class="badge badge-{{if or (eq .Status "running") (eq .Status "online")}}green{{else if or (eq .Status "stopped") (eq .Status "offline")}}red{{else}}grey{{end}}">{{.Status}}</span></td>
+      <td>{{.CPUCores}}</td>
+      <td>{{formatMB .MemoryMB}}</td>
+      <td>{{formatGB .DiskGB}}</td>
+      <td>{{.Application}}</td>
+      <td>{{if gt .MonthlyCostEUR 0.0}}{{printf "%.2f" .MonthlyCostEUR}} EUR{{end}}</td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+
+{{end}}
+
+{{if .Findings}}
+<h2>Efficiency Findings</h2>
+<table>
+  <thead><tr><th>Severity</th><th>Host</th><th>Message</th></tr></thead>
+  <tbody>
+  {{range .Findings}}
+  <tr>
+    <td><span class="badge badge-{{if eq .Severity "error"}}red{{else if eq .Severity "warning"}}yellow{{else}}grey{{end}}">{{.Severity}}</span></td>
+    <td>{{if .HostName}}<a href="/hosts/{{.HostName}}">{{.HostName}}</a>{{end}}</td>
+    <td>{{.Message}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+{{end}}
+{{end}}
