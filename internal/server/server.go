@@ -60,7 +60,7 @@ func New(st *store.Store, orch *collector.Orchestrator, log *slog.Logger) (*Serv
 		"host_detail.html",
 		"services.html",
 		"networks.html",
-		"findings.html",
+		"tailscale.html",
 		"collections.html",
 	}
 
@@ -99,7 +99,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /hosts/{name}", s.handleHostDetail)
 	mux.HandleFunc("GET /services", s.handleServices)
 	mux.HandleFunc("GET /networks", s.handleNetworks)
-	mux.HandleFunc("GET /findings", s.handleFindings)
+	mux.HandleFunc("GET /tailscale", s.handleTailscale)
 	mux.HandleFunc("GET /collections", s.handleCollections)
 	mux.HandleFunc("POST /collections/trigger", s.handleTriggerCollection)
 

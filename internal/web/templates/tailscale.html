@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>Tailscale ACL Dataflows</h1>
+
+{{if .Dataflows}}
+<table>
+  <thead>
+    <tr>
+      <th>Source</th>
+      <th>Destination</th>
+      <th>Ports</th>
+      <th>Type</th>
+    </tr>
+  </thead>
+  <tbody>
+  {{range .Dataflows}}
+    <tr>
+      <td>{{.Source}}</td>
+      <td>{{.Dest}}</td>
+      <td><code>{{.Ports}}</code></td>
+      <td><span class="badge badge-{{if eq .Type "network"}}green{{else}}grey{{end}}">{{.Type}}</span></td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+{{else}}
+<p>No ACL data available. The Tailscale Control Plane API collector may not be configured.</p>
+{{end}}
+{{end}}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/meltforce/homelib/internal/aclview"
 	"github.com/meltforce/homelib/internal/model"
 )
 
@@ -108,19 +109,20 @@ func (s *Server) handleNetworks(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleFindings(w http.ResponseWriter, r *http.Request) {
-	source := r.URL.Query().Get("source")
-	severity := r.URL.Query().Get("severity")
+func (s *Server) handleTailscale(w http.ResponseWriter, r *http.Request) {
+	var rows []aclview.DataflowRow
 
-	findings, err := s.store.GetFindings(source, severity)
+	acl, err := s.store.GetTailscaleACL()
 	if err != nil {
-		s.log.Error("get findings", "error", err)
+		s.log.Error("get tailscale ACL", "error", err)
+	} else if acl != nil {
+		rows = aclview.ParseDataflows(*acl)
 	}
 
-	s.render(w, "findings.html", map[string]any{
-		"Title":    "Findings",
-		"Findings": findings,
-		"Active":   "findings",
+	s.render(w, "tailscale.html", map[string]any{
+		"Title":     "Tailscale",
+		"Dataflows": rows,
+		"Active":    "tailscale",
 	})
 }
 

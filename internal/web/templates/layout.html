@@ -18,6 +18,8 @@
     .stat-card h2 { margin-bottom: 0; font-size: 2.5em; }
     .stat-card small { color: var(--pico-muted-color); }
     table { font-size: 0.9em; }
+    th[data-sortable] { cursor: pointer; user-select: none; }
+    th .sort-indicator { font-size: 0.7em; margin-left: 0.3em; }
     .grid-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
   </style>
 </head>
@@ -31,7 +33,7 @@
       <li><a href="/hosts" {{if eq .Active "hosts"}}class="active"{{end}}>Hosts</a></li>
       <li><a href="/services" {{if eq .Active "services"}}class="active"{{end}}>Services</a></li>
       <li><a href="/networks" {{if eq .Active "networks"}}class="active"{{end}}>Networks</a></li>
-      <li><a href="/findings" {{if eq .Active "findings"}}class="active"{{end}}>Findings</a></li>
+      <li><a href="/tailscale" {{if eq .Active "tailscale"}}class="active"{{end}}>Tailscale</a></li>
       <li><a href="/collections" {{if eq .Active "collections"}}class="active"{{end}}>Collections</a></li>
     </ul>
   </nav>
@@ -41,5 +43,41 @@
   <footer class="container">
     <small>homelib — Homelab Inventory Service</small>
   </footer>
+  <script>
+  function initSortable() {
+    document.querySelectorAll('table thead th').forEach(function(th) {
+      if (th.hasAttribute('data-sortable')) return;
+      th.setAttribute('data-sortable', '');
+      var indicator = document.createElement('span');
+      indicator.className = 'sort-indicator';
+      th.appendChild(indicator);
+      th.addEventListener('click', function() {
+        var table = th.closest('table');
+        var tbody = table.querySelector('tbody');
+        var idx = Array.from(th.parentNode.children).indexOf(th);
+        var asc = th.dataset.sortDir !== 'asc';
+        th.parentNode.querySelectorAll('th').forEach(function(h) {
+          h.dataset.sortDir = '';
+          h.querySelector('.sort-indicator').textContent = '';
+        });
+        th.dataset.sortDir = asc ? 'asc' : 'desc';
+        indicator.textContent = asc ? ' \u25B2' : ' \u25BC';
+        var rows = Array.from(tbody.querySelectorAll('tr'));
+        rows.sort(function(a, b) {
+          var cellA = a.children[idx], cellB = b.children[idx];
+          if (!cellA || !cellB) return 0;
+          var va = (cellA.querySelector('.badge') || cellA).textContent.trim();
+          var vb = (cellB.querySelector('.badge') || cellB).textContent.trim();
+          var na = parseFloat(va), nb = parseFloat(vb);
+          if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+          return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+        rows.forEach(function(r) { tbody.appendChild(r); });
+      });
+    });
+  }
+  initSortable();
+  document.body.addEventListener('htmx:afterSwap', initSortable);
+  </script>
 </body>
 </html>{{end}}
