@@ -42,7 +42,6 @@ jobs:
 
       - name: Deploy
         run: |
-          HOST_IP=$(tailscale ip -4 ${{ secrets.DEPLOY_HOST }})
-          ssh -o StrictHostKeyChecking=no root@"$HOST_IP" \
+          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEPLOY_HOST }} \
             "docker pull meltforce/homelib:edge && \
              cd ${{ vars.DEPLOY_PATH }} && docker compose up -d homelib"
