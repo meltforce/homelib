@@ -31,7 +31,7 @@ type Config struct {
 
 type SecretBackendConfig struct {
 	Type     string `yaml:"type"`      // "setec" or "" (empty = legacy op:// behavior)
-	SetecURL string `yaml:"setec_url"` // e.g. "https://setec.leo-royal.ts.net"
+	SetecURL string `yaml:"setec_url"` // e.g. "https://setec.your-tailnet.ts.net"
 }
 
 type ServiceConfig struct {

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -204,5 +203,5 @@ func main() {
 	defer cancel()
 	httpSrv.Shutdown(ctx)
 
-	fmt.Println("goodbye")
+	log.Info("goodbye")
 }

@@ -5,3 +5,4 @@ homelib
 *.db-wal
 config.yaml
 .env
+.claude/

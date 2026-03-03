@@ -1,5 +1,5 @@
 service:
-  hostname: homelib              # tsnet hostname (homelib.tailnet-name.ts.net)
+  hostname: homelib              # tsnet hostname (homelib.your-tailnet.ts.net)
   state_dir: /data/tsnet         # tsnet state directory
   data_dir: /data                # SQLite database location
   log_level: info                # info or debug
@@ -10,9 +10,9 @@ schedule:
 
 # Secret backend: "setec" uses Tailscale's secret manager (requires tsnet).
 # Omit or leave type empty to use the legacy op:// behavior.
-# secret_backend:
-#   type: setec
-#   setec_url: https://setec.leo-royal.ts.net
+secret_backend:
+  type: setec
+  setec_url: https://setec.your-tailnet.ts.net
 
 # Secrets: resolution order depends on backend:
 #   1. Environment variable HOMELIB_<UPPER_KEY>
@@ -20,24 +20,21 @@ schedule:
 #   3. op:// via OP_SERVICE_ACCOUNT_TOKEN (if value starts with op://)
 #   4. Literal value in config
 #
-# With setec backend, values are setec secret names:
-#   hetzner_api_token: "homelib/hetzner-api-token"
-#   komodo_api_key: "homelib/komodo-api-key"
-#   ...
-# With op:// backend (default), values are 1Password references:
+# With setec backend (shown below), values are setec secret names.
+# With op:// backend, use 1Password references like "op://Vault/item/field".
 secrets:
-  hetzner_api_token: "op://Homelab/hetzner-api/credential"
-  komodo_api_key: "op://Homelab/komodo-api/Benutzername"
-  komodo_api_secret: "op://Homelab/komodo-api/Anmeldedaten"
-  unifi_username: "op://Homelab/unifipoller/username"
-  unifi_password: "op://Homelab/unifipoller/password"
-  ts_auth_key: "op://Homelab/homelib-ts/credential"
-  ts_api_key: "op://Homelab/tailscale-api/credential"
+  hetzner_api_token: "homelib/hetzner-api-token"
+  komodo_api_key: "homelib/komodo-api-key"
+  komodo_api_secret: "homelib/komodo-api-secret"
+  unifi_username: "homelib/unifi-username"
+  unifi_password: "homelib/unifi-password"
+  ts_auth_key: "homelib/ts-auth-key"
+  ts_api_key: "homelib/ts-api-key"
 
 collectors:
   proxmox:
     enabled: true
-    host: dude                   # Tailscale hostname (SSH via Tailscale)
+    host: pve-host               # Tailscale hostname of Proxmox node (SSH via Tailscale)
     user: root
   tailscale:
     enabled: true                # Always active (tsnet basis)
@@ -47,10 +44,10 @@ collectors:
     enabled: true
   komodo:
     enabled: true
-    base_url: https://komodo.leo-royal.ts.net
+    base_url: https://komodo.your-tailnet.ts.net
   unifi:
     enabled: true
-    base_url: https://maude
+    base_url: https://unifi-controller
     site: default
     include_clients: false
 
@@ -59,52 +56,47 @@ plugins:
     enabled: false               # Capacity is computed natively from Proxmox host data
     description: "Proxmox capacity planning & resource overview"
     type: ssh
-    host: dude
+    host: pve-host
     user: root
     command: /usr/local/bin/pve-resources --json
     timeout: 30s
     schedule: default
 
   - name: pve-efficiency
-    enabled: true
+    enabled: false
     description: "RAM efficiency analysis & right-sizing"
     type: ssh
-    host: dude
+    host: pve-host
     user: root
     command: /usr/local/bin/pve-efficiency --json
     timeout: 30s
     schedule: default
 
+# Roles: enrich hosts with infrastructure roles and application categories.
+# These are optional — hosts will still be collected without role definitions.
 roles:
   proxmox_nodes:
-    dude:
+    pve-host:
       infrastructure_role: hypervisor
       workload_specialization: general
       description: "Primary Proxmox host"
-    donny:
-      infrastructure_role: hypervisor
-      workload_specialization: home-automation
-      description: "Secondary Proxmox host"
 
   application_categories:
     homeassistant: automation
     jellyfin: media-server
     caddy: reverse-proxy
-    komodo: management
     paperless: documents
     vaultwarden: security
     gitea: development
     immich: photos
 
   guest_overrides:
-    brandt: homeassistant        # hostname != application name
+    # Use when hostname differs from application name:
+    # my-vm: homeassistant
 
   tailscale_devices:
-    lebowski:
-      role: fileserver
-      application: truenas
-      description: "TrueNAS SCALE fileserver"
-    maude:
-      role: gateway
-      application: unifi
-      description: "UniFi Dream Machine"
+    # Enrich Tailscale devices with role/application metadata:
+    # my-nas:
+    #   role: fileserver
+    #   application: truenas
+    #   description: "TrueNAS SCALE fileserver"
