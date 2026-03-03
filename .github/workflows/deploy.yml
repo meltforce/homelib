@@ -40,11 +40,9 @@ jobs:
           audience: ${{ secrets.TS_AUDIENCE }}
           tags: tag:ci
 
-      - name: Wait for Tailscale DNS
-        run: tailscale status
-
       - name: Deploy
         run: |
-          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEPLOY_HOST }} \
+          HOST_IP=$(tailscale ip -4 ${{ secrets.DEPLOY_HOST }})
+          ssh -o StrictHostKeyChecking=no root@"$HOST_IP" \
             "docker pull meltforce/homelib:edge && \
              cd ${{ vars.DEPLOY_PATH }} && docker compose up -d homelib"
