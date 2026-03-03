@@ -40,6 +40,9 @@ jobs:
           audience: ${{ secrets.TS_AUDIENCE }}
           tags: tag:ci
 
+      - name: Wait for Tailscale DNS
+        run: tailscale status
+
       - name: Deploy
         run: |
           ssh -o StrictHostKeyChecking=no root@${{ secrets.DEPLOY_HOST }} \
