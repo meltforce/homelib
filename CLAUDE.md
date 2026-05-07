@@ -31,7 +31,7 @@ go build -o homelib .
 ## Key Design Decisions
 
 - **No auth** — Tailscale ACLs handle access control
-- **tsnet** — Native Tailscale integration, no separate proxy
+- **tsnet (inbound only)** — The tsnet listener provides the `:443` Web-UI / MCP endpoint with the homelib node identity. Outbound HTTP from collectors uses Go's default `http.Client` and routes through the container's bridge network, so it appears to the tailnet as the **host's** identity (the LXC's tags), not the tsnet listener's tags. Tailscale ACL grants for outbound calls must be written against the host tag accordingly.
 - **SQLite WAL** — Single-file DB, concurrent reads
 - **Graceful degradation** — Failed collectors don't block others
 - **Plugin system** — External scripts (local/SSH) with JSON output

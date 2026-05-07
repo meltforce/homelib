@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "homelib": {
+      "type": "http",
+      "url": "https://homelib.coydog-fence.ts.net/mcp"
+    }
+  }
+}
