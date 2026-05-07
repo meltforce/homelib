@@ -124,8 +124,8 @@ func main() {
 	if cfg.Collectors.Hetzner.Enabled {
 		orch.Register(collector.NewHetznerCollector(cfg.Collectors.Hetzner, cfg, log))
 	}
-	if cfg.Collectors.Komodo.Enabled {
-		orch.Register(collector.NewKomodoCollector(cfg.Collectors.Komodo, cfg, log))
+	if cfg.Collectors.Dockhand.Enabled {
+		orch.Register(collector.NewDockhandCollector(cfg.Collectors.Dockhand, cfg, log))
 	}
 	if cfg.Collectors.UniFi.Enabled {
 		orch.Register(collector.NewUniFiCollector(cfg.Collectors.UniFi, cfg, log))

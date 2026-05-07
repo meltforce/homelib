@@ -38,12 +38,13 @@
 {{if .Services}}
 <h2>Services</h2>
 <table>
-  <thead><tr><th>Service</th><th>Container</th><th>Image</th><th>Stack</th></tr></thead>
+  <thead><tr><th>Service</th><th>Container</th><th>State</th><th>Image</th><th>Stack</th></tr></thead>
   <tbody>
   {{range .Services}}
     <tr>
       <td>{{.ServiceName}}</td>
       <td>{{.ContainerName}}</td>
+      <td>{{if .Status}}<span class="badge badge-{{if eq .Status "running"}}green{{else if or (eq .Status "stopped") (eq .Status "exited") (eq .Status "dead")}}red{{else}}grey{{end}}">{{.Status}}</span>{{end}}</td>
       <td>{{.Image}}</td>
       <td>{{.StackName}}</td>
     </tr>

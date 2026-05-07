@@ -24,8 +24,7 @@ secret_backend:
 # With op:// backend, use 1Password references like "op://Vault/item/field".
 secrets:
   hetzner_api_token: "homelib/hetzner-api-token"
-  komodo_api_key: "homelib/komodo-api-key"
-  komodo_api_secret: "homelib/komodo-api-secret"
+  dockhand_api_token: "docker/shared/dockhand-api-token"
   unifi_username: "homelib/unifi-username"
   unifi_password: "homelib/unifi-password"
   ts_auth_key: "homelib/ts-auth-key"
@@ -42,9 +41,9 @@ collectors:
       enabled: true              # ACLs, DNS, Routes, Keys (needs ts_api_key)
   hetzner:
     enabled: true
-  komodo:
+  dockhand:
     enabled: true
-    base_url: https://komodo.your-tailnet.ts.net
+    base_url: https://dockhand.your-tailnet.ts.net
   unifi:
     enabled: true
     base_url: https://unifi-controller

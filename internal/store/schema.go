@@ -51,6 +51,9 @@ CREATE TABLE IF NOT EXISTS services (
 	container_name TEXT,
 	image          TEXT,
 	stack_name     TEXT,
+	status         TEXT,
+	ports          TEXT,
+	created_at     TEXT,
 	details        TEXT
 );
 

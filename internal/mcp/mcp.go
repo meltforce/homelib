@@ -34,7 +34,7 @@ type Tools struct {
 func (t *Tools) Register(s *server.MCPServer) {
 	s.AddTool(mcp.NewTool("list_hosts",
 		mcp.WithDescription("List all hosts/servers/VMs in the inventory. Filter by source, zone, status, or type."),
-		mcp.WithString("source", mcp.Description("Filter by source: proxmox, tailscale, hetzner, komodo, unifi")),
+		mcp.WithString("source", mcp.Description("Filter by source: proxmox, tailscale, hetzner, dockhand, unifi")),
 		mcp.WithString("zone", mcp.Description("Filter by zone: homelab, private-cloud, public-cloud")),
 		mcp.WithString("status", mcp.Description("Filter by status: running, stopped, online, offline")),
 		mcp.WithString("type", mcp.Description("Filter by host type: node, vm, lxc, cloud, device, tailscale")),

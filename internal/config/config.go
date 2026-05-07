@@ -50,7 +50,7 @@ type CollectorsConfig struct {
 	Proxmox   ProxmoxCollectorConfig   `yaml:"proxmox"`
 	Tailscale TailscaleCollectorConfig `yaml:"tailscale"`
 	Hetzner   HetznerCollectorConfig   `yaml:"hetzner"`
-	Komodo    KomodoCollectorConfig    `yaml:"komodo"`
+	Dockhand  DockhandCollectorConfig  `yaml:"dockhand"`
 	UniFi     UniFiCollectorConfig     `yaml:"unifi"`
 }
 
@@ -73,7 +73,7 @@ type HetznerCollectorConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-type KomodoCollectorConfig struct {
+type DockhandCollectorConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	BaseURL string `yaml:"base_url"`
 }

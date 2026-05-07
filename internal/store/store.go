@@ -34,7 +34,45 @@ func New(dataDir string) (*Store, error) {
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
 
+	// Migrate: add status/ports/created_at columns to services if missing
+	if err := migrateServicesColumns(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("migrate services: %w", err)
+	}
+
 	return &Store{db: db}, nil
+}
+
+// migrateServicesColumns adds status/ports/created_at to the services table
+// if a previous schema is in place.
+func migrateServicesColumns(db *sql.DB) error {
+	rows, err := db.Query("PRAGMA table_info(services)")
+	if err != nil {
+		return err
+	}
+	existing := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[name] = true
+	}
+	rows.Close()
+
+	for _, col := range []string{"status", "ports", "created_at"} {
+		if existing[col] {
+			continue
+		}
+		if _, err := db.Exec("ALTER TABLE services ADD COLUMN " + col + " TEXT"); err != nil {
+			return fmt.Errorf("add column %s: %w", col, err)
+		}
+	}
+	return nil
 }
 
 // needsHostsMigration checks if the hosts table has the old "source" column.
@@ -330,17 +368,23 @@ func (s *Store) InsertServices(runID int64, services []model.Service) error {
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO services (run_id, host_name, source, service_name, container_name, image, stack_name, details)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+		INSERT INTO services (run_id, host_name, source, service_name, container_name, image, stack_name, status, ports, created_at, details)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
 	for _, svc := range services {
+		var createdAt sql.NullString
+		if svc.CreatedAt != nil && !svc.CreatedAt.IsZero() {
+			createdAt = sql.NullString{String: svc.CreatedAt.UTC().Format(time.RFC3339), Valid: true}
+		}
 		_, err := stmt.Exec(runID, svc.HostName, svc.Source, svc.ServiceName,
 			nullableString(svc.ContainerName), nullableString(svc.Image),
-			nullableString(svc.StackName), rawJSON(svc.Details))
+			nullableString(svc.StackName),
+			nullableString(svc.Status), nullableString(svc.Ports), createdAt,
+			rawJSON(svc.Details))
 		if err != nil {
 			return fmt.Errorf("insert service %s: %w", svc.ServiceName, err)
 		}
@@ -350,7 +394,7 @@ func (s *Store) InsertServices(runID int64, services []model.Service) error {
 
 // GetServices returns services from the latest run with optional host filter.
 func (s *Store) GetServices(hostName, stackName string) ([]model.Service, error) {
-	query := `SELECT id, run_id, host_name, source, service_name, container_name, image, stack_name, details
+	query := `SELECT id, run_id, host_name, source, service_name, container_name, image, stack_name, status, ports, created_at, details
 		FROM services WHERE run_id = (SELECT MAX(id) FROM collection_runs WHERE status = 'completed')`
 	var args []any
 	if hostName != "" {
@@ -371,22 +415,40 @@ func (s *Store) GetServices(hostName, stackName string) ([]model.Service, error)
 
 	var services []model.Service
 	for rows.Next() {
-		var svc model.Service
-		var container, image, stack, details sql.NullString
-		if err := rows.Scan(&svc.ID, &svc.RunID, &svc.HostName, &svc.Source, &svc.ServiceName,
-			&container, &image, &stack, &details); err != nil {
+		svc, err := scanService(rows)
+		if err != nil {
 			return nil, err
 		}
-		svc.ContainerName = container.String
-		svc.Image = image.String
-		svc.StackName = stack.String
-		if details.Valid {
-			raw := json.RawMessage(details.String)
-			svc.Details = &raw
-		}
-		services = append(services, svc)
+		services = append(services, *svc)
 	}
 	return services, rows.Err()
+}
+
+// scanService scans a row from a SELECT that returns the full service column list
+// (id, run_id, host_name, source, service_name, container_name, image, stack_name,
+// status, ports, created_at, details).
+func scanService(row scannable) (*model.Service, error) {
+	var svc model.Service
+	var container, image, stack, status, ports, createdAt, details sql.NullString
+	if err := row.Scan(&svc.ID, &svc.RunID, &svc.HostName, &svc.Source, &svc.ServiceName,
+		&container, &image, &stack, &status, &ports, &createdAt, &details); err != nil {
+		return nil, err
+	}
+	svc.ContainerName = container.String
+	svc.Image = image.String
+	svc.StackName = stack.String
+	svc.Status = status.String
+	svc.Ports = ports.String
+	if createdAt.Valid {
+		if t, err := time.Parse(time.RFC3339, createdAt.String); err == nil {
+			svc.CreatedAt = &t
+		}
+	}
+	if details.Valid {
+		raw := json.RawMessage(details.String)
+		svc.Details = &raw
+	}
+	return &svc, nil
 }
 
 // --- Networks ---
@@ -837,7 +899,7 @@ func (s *Store) SearchInventory(query string) ([]model.Host, []model.Service, []
 		return nil, nil, nil, err
 	}
 
-	svcRows, err := s.db.Query(`SELECT id, run_id, host_name, source, service_name, container_name, image, stack_name, details
+	svcRows, err := s.db.Query(`SELECT id, run_id, host_name, source, service_name, container_name, image, stack_name, status, ports, created_at, details
 		FROM services WHERE run_id = (SELECT MAX(id) FROM collection_runs WHERE status = 'completed')
 		AND (service_name LIKE ? OR container_name LIKE ? OR image LIKE ? OR stack_name LIKE ?)
 		ORDER BY host_name, service_name`, q, q, q, q)
@@ -847,20 +909,11 @@ func (s *Store) SearchInventory(query string) ([]model.Host, []model.Service, []
 	defer svcRows.Close()
 	var services []model.Service
 	for svcRows.Next() {
-		var svc model.Service
-		var container, image, stack, details sql.NullString
-		if err := svcRows.Scan(&svc.ID, &svc.RunID, &svc.HostName, &svc.Source, &svc.ServiceName,
-			&container, &image, &stack, &details); err != nil {
+		svc, err := scanService(svcRows)
+		if err != nil {
 			return nil, nil, nil, err
 		}
-		svc.ContainerName = container.String
-		svc.Image = image.String
-		svc.StackName = stack.String
-		if details.Valid {
-			raw := json.RawMessage(details.String)
-			svc.Details = &raw
-		}
-		services = append(services, svc)
+		services = append(services, *svc)
 	}
 
 	findRows, err := s.db.Query(`SELECT id, run_id, source, finding_type, severity, host_name, message, details

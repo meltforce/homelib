@@ -1,6 +1,6 @@
 # homelib
 
-Go service that collects homelab inventory from multiple sources (Proxmox, Tailscale, Hetzner, Komodo, UniFi, plugins) and provides a Web UI, JSON API, and MCP server.
+Go service that collects homelab inventory from multiple sources (Proxmox, Tailscale, Hetzner, Dockhand, UniFi, plugins) and provides a Web UI, JSON API, and MCP server.
 
 ## Build & Run
 
@@ -20,7 +20,7 @@ go build -o homelib .
 - `main.go` — Entry point: tsnet, HTTP server, scheduler
 - `internal/config/` — YAML config with env-var + op:// secret resolution
 - `internal/model/` — Go structs for all data types
-- `internal/collector/` — Collector interface + implementations (proxmox, tailscale, hetzner, komodo, unifi, plugin)
+- `internal/collector/` — Collector interface + implementations (proxmox, tailscale, hetzner, dockhand, unifi, plugin)
 - `internal/crossref/` — Cross-reference logic + role enrichment
 - `internal/store/` — SQLite (WAL mode) persistence
 - `internal/scheduler/` — Cron-based scheduling

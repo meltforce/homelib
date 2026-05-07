@@ -2,7 +2,7 @@
 
 Homelab inventory service that collects infrastructure data from multiple sources and provides a unified view through a web UI, JSON API, and MCP server.
 
-Homelib aggregates hosts, services, networks, and capacity data from Proxmox, Tailscale, Hetzner Cloud, Komodo, and UniFi into a single SQLite database. It runs as a Tailscale node via [tsnet](https://tailscale.com/kb/1244/tsnet) — no reverse proxy or auth layer needed.
+Homelib aggregates hosts, services, networks, and capacity data from Proxmox, Tailscale, Hetzner Cloud, Dockhand, and UniFi into a single SQLite database. It runs as a Tailscale node via [tsnet](https://tailscale.com/kb/1244/tsnet) — no reverse proxy or auth layer needed.
 
 > **Note:** This is a personal side project built for my own homelab. It's published as-is and may not see regular updates or active maintenance.
 
@@ -10,7 +10,7 @@ Homelib aggregates hosts, services, networks, and capacity data from Proxmox, Ta
 
 ## Features
 
-- **Multi-source collection** — Proxmox (SSH), Tailscale (Local + Control Plane API), Hetzner Cloud, Komodo, UniFi
+- **Multi-source collection** — Proxmox (SSH), Tailscale (Local + Control Plane API), Hetzner Cloud, Dockhand, UniFi
 - **MCP server** — 13 tools for AI/agent integration via [Model Context Protocol](https://modelcontextprotocol.io), usable from Claude, Claude Code, or any MCP client
 - **Web UI** — Dashboard, host browser, services, networks, Tailscale ACL viewer, capacity planner
 - **JSON API** — Full REST API with filtering and search
@@ -137,7 +137,7 @@ Copy `config.example.yaml` and edit to match your environment. All secrets are r
 | **Tailscale** | tsnet Local API + Control Plane API | Devices, online status, ACLs, DNS config, subnet routes |
 | **Proxmox** | SSH via Tailscale | Nodes, VMs, LXC containers, CPU/memory/disk, status |
 | **Hetzner** | Cloud API | Servers, specs, pricing, firewalls |
-| **Komodo** | API | Docker stacks, containers, images |
+| **Dockhand** | API | Docker containers, stacks, status, ports |
 | **UniFi** | Controller API | VLANs, subnets, DHCP, network devices |
 
 The Tailscale collector is always active — homelib runs on Tailscale via tsnet and uses the Local API as its primary data source. The other collectors can be independently enabled/disabled. All collectors run concurrently.
@@ -224,7 +224,7 @@ config.yaml
   main.go
     |-- Store (SQLite, WAL mode)
     |-- Orchestrator
-    |     |-- Collectors (Proxmox, Tailscale, Hetzner, Komodo, UniFi)
+    |     |-- Collectors (Proxmox, Tailscale, Hetzner, Dockhand, UniFi)
     |     |-- Plugins (custom scripts)
     |     |-- Merge (deduplicate hosts across sources)
     |     |-- Crossref (validate zones, enrich roles)

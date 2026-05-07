@@ -20,7 +20,7 @@ type CollectionRun struct {
 type CollectionSource struct {
 	ID           int64      `json:"id"`
 	RunID        int64      `json:"run_id"`
-	Source       string     `json:"source"`       // proxmox, tailscale, hetzner, komodo, unifi, plugin:<name>
+	Source       string     `json:"source"`       // proxmox, tailscale, hetzner, dockhand, unifi, plugin:<name>
 	SourceType   string     `json:"source_type"`  // native, plugin
 	Status       string     `json:"status"`       // running, completed, failed, skipped
 	StartedAt    time.Time  `json:"started_at"`
@@ -71,11 +71,14 @@ type Service struct {
 	ID            int64            `json:"id"`
 	RunID         int64            `json:"run_id"`
 	HostName      string           `json:"host_name"`
-	Source        string           `json:"source"` // komodo
+	Source        string           `json:"source"` // dockhand, plugin
 	ServiceName   string           `json:"service_name"`
 	ContainerName string           `json:"container_name,omitempty"`
 	Image         string           `json:"image,omitempty"`
 	StackName     string           `json:"stack_name,omitempty"`
+	Status        string           `json:"status,omitempty"` // running, stopped, exited, paused, restarting
+	Ports         string           `json:"ports,omitempty"`  // e.g. "8080->80/tcp, 443->443/tcp"
+	CreatedAt     *time.Time       `json:"created_at,omitempty"`
 	Details       *json.RawMessage `json:"details,omitempty"`
 }
 
