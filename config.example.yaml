@@ -28,7 +28,8 @@ secrets:
   unifi_username: "homelib/unifi-username"
   unifi_password: "homelib/unifi-password"
   ts_auth_key: "homelib/ts-auth-key"
-  ts_api_key: "homelib/ts-api-key"
+  ts_oauth_client_id: "homelib/ts-oauth-client-id"
+  ts_oauth_client_secret: "homelib/ts-oauth-client-secret"
 
 collectors:
   proxmox:

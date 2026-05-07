@@ -4,19 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/netip"
 	"strings"
 
-	"io"
-
 	"github.com/meltforce/homelib/internal/config"
 	"github.com/meltforce/homelib/internal/model"
 	"github.com/tailscale/hujson"
+	"golang.org/x/oauth2/clientcredentials"
 	"tailscale.com/client/tailscale"
 	"tailscale.com/types/views"
 )
+
+const tailscaleAPIBase = "https://api.tailscale.com/api/v2"
 
 // TailscaleCollector collects device info via the tsnet Local API
 // and optionally ACLs/DNS/Routes via the Control Plane API.
@@ -146,22 +148,33 @@ func (t *TailscaleCollector) peerToHost(hostname string, ips []netip.Addr, osNam
 }
 
 func (t *TailscaleCollector) collectControlPlane(ctx context.Context, result *model.CollectionResult) error {
-	apiKey, err := t.appCfg.ResolveSecret("ts_api_key")
+	clientID, err := t.appCfg.ResolveSecret("ts_oauth_client_id")
 	if err != nil {
-		return fmt.Errorf("resolve API key: %w", err)
+		return fmt.Errorf("resolve OAuth client_id: %w", err)
+	}
+	clientSecret, err := t.appCfg.ResolveSecret("ts_oauth_client_secret")
+	if err != nil {
+		return fmt.Errorf("resolve OAuth client_secret: %w", err)
 	}
 
-	// We use raw HTTP calls to api.tailscale.com since the Go SDK v2 client
-	// requires more setup. This keeps it simple.
-	client := &http.Client{}
-	baseURL := "https://api.tailscale.com/api/v2"
+	// Tailscale OAuth: client_credentials grant exchanges the client_id +
+	// client_secret for short-lived access tokens that the *http.Client below
+	// auto-attaches and auto-refreshes. Scopes are configured admin-side on
+	// the OAuth client in the Tailscale console; this collector doesn't
+	// request them per-call.
+	oauthCfg := clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     tailscaleAPIBase + "/oauth/token",
+	}
+	client := oauthCfg.Client(ctx)
+	baseURL := tailscaleAPIBase
 
 	doGet := func(path string) (json.RawMessage, error) {
 		req, err := http.NewRequestWithContext(ctx, "GET", baseURL+path, nil)
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+apiKey)
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
@@ -186,7 +199,6 @@ func (t *TailscaleCollector) collectControlPlane(ctx context.Context, result *mo
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+apiKey)
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
