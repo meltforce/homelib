@@ -1,16 +1,12 @@
-name: Deploy
+name: Build
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,16 +28,3 @@ jobs:
             VERSION=edge-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          audience: ${{ secrets.TS_AUDIENCE }}
-          tags: tag:ci
-
-      - name: Deploy
-        run: |
-          ssh -o StrictHostKeyChecking=no root@${{ secrets.DEPLOY_HOST }} \
-            "docker pull meltforce/homelib:edge && \
-             cd ${{ vars.DEPLOY_PATH }} && docker compose up -d homelib"
