@@ -295,34 +295,5 @@ func (t *TailscaleCollector) collectControlPlane(ctx context.Context, result *mo
 		}
 	}
 
-	// API Keys
-	keysData, err := doGet("/tailnet/" + tailnet + "/keys")
-	if err != nil {
-		t.log.Warn("failed to fetch keys", "error", err)
-	} else {
-		var keysResp struct {
-			Keys []struct {
-				ID           string `json:"id"`
-				Description  string `json:"description"`
-				Created      string `json:"created"`
-				Expires      string `json:"expires"`
-				Capabilities json.RawMessage `json:"capabilities"`
-			} `json:"keys"`
-		}
-		if err := json.Unmarshal(keysData, &keysResp); err == nil {
-			for _, k := range keysResp.Keys {
-				tk := model.TailscaleKey{
-					KeyID:       k.ID,
-					Description: k.Description,
-				}
-				if k.Capabilities != nil {
-					caps := json.RawMessage(k.Capabilities)
-					tk.Capabilities = &caps
-				}
-				result.Keys = append(result.Keys, tk)
-			}
-		}
-	}
-
 	return nil
 }
